@@ -1,12 +1,10 @@
 <?php
 include_once "db_connection.php";
-header('Content-Type: application/json');
 
-// Database connection
 $servername = "localhost";
 $username = "root";
-$password = ""; // Default XAMPP password
-$dbname = "student_rewards"; // Replace with your database name
+$password = ""; // Default password for XAMPP MySQL
+$dbname = "student_rewards"; // Replace with your actual database name
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 
@@ -15,19 +13,48 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// API endpoint to fetch all vouchers
-if ($_SERVER['REQUEST_METHOD'] == 'GET') {
-    $sql = "SELECT * FROM vouchers"; // Replace with your table name
-    $result = $conn->query($sql);
+// Get all vouchers from the laptop database
+$sql = "SELECT * FROM vouchers WHERE reward_amount IS NOT NULL";
+$result = $conn->query($sql);
 
-    $vouchers = array();
+if ($result->num_rows > 0) {
+    // Loop through the vouchers and send them to the Orange Pi PC via REST API
     while ($row = $result->fetch_assoc()) {
-        $vouchers[] = $row;
+        $voucher_code = $row['voucher_code'];
+        $duration = $row['duration'];
+        $duration_unit = $row['duration_unit'];
+      
+
+        // Send the voucher data to the Orange Pi PC's API
+        $url = "http://your_orange_pi_ip_address/admin_voucher.php"; // Replace with your Orange Pi IP address
+        $data = [
+            'voucher_code' => $voucher_code,
+            'duration' => $duration,
+            'duration_unit' => $duration_unit,
+           
+        ];
+
+        $options = [
+            'http' => [
+                'method'  => 'POST',
+                'header'  => "Content-Type: application/x-www-form-urlencoded\r\n",
+                'content' => http_build_query($data)
+            ]
+        ];
+        $context = stream_context_create($options);
+        $result = file_get_contents($url, false, $context);
+
+        // Check if the transfer was successful
+        if ($result === FALSE) {
+            echo "Error transferring voucher: " . $voucher_code . "\n";
+        }
     }
 
-    echo json_encode($vouchers);
+    echo "Voucher sync complete!";
+} else {
+    echo "No vouchers to sync.";
 }
 
-// Close connection
 $conn->close();
 ?>
+
