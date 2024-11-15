@@ -26,7 +26,7 @@ if ($result->num_rows > 0) {
       
 
         // Send the voucher data to the Orange Pi PC's API
-        $url = "http://your_orange_pi_ip_address/admin_voucher.php"; // Replace with your Orange Pi IP address
+        $url = "http://http://192.168.2.138/admin_voucher.php"; // Replace with your Orange Pi IP address
         $data = [
             'voucher_code' => $voucher_code,
             'duration' => $duration,
