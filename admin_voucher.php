@@ -13,26 +13,28 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Handle voucher creation
-if (isset($_POST['create_voucher'])) {
-    $voucher_code = trim($_POST['voucher_code']);
-    $duration = intval($_POST['duration']);
-    $duration_unit = $_POST['duration_unit'];
+// Handle POST requests to create a voucher
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['voucher_code']) && isset($_POST['duration']) && isset($_POST['duration_unit'])) {
+        $voucher_code = $_POST['voucher_code'];
+        $duration = $_POST['duration'];
+        $duration_unit = $_POST['duration_unit'];
 
-    if ($voucher_code !== '' && $duration > 0) {
+        // Insert voucher into the database
         $insert_sql = "INSERT INTO vouchers (voucher_code, duration, duration_unit) VALUES (?, ?, ?)";
         $stmt = $conn->prepare($insert_sql);
         $stmt->bind_param("sis", $voucher_code, $duration, $duration_unit);
-        $stmt->execute();
+        if ($stmt->execute()) {
+            echo "Voucher inserted successfully!";
+        } else {
+            echo "Error: " . $conn->error;
+        }
         $stmt->close();
-
-        // Redirect to the voucher management page
-        header("Location: admin_voucher.php");
-        exit();
     } else {
-        $error_message = "Voucher code and duration cannot be empty.";
+        echo "Missing required fields!";
     }
 }
+
 
 // Query to fetch existing vouchers
 $vouchers_query = "SELECT voucher_code, time_created, duration, duration_unit FROM vouchers";
