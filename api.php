@@ -1,66 +1,47 @@
 <?php
-include_once "db_connection.php";
+header('Content-Type: application/json');
+include_once 'db_connection.php';
 
-// Database credentials
-$servername = "localhost";
-$username = "root";
-$password = ""; // Default password for XAMPP MySQL
-$dbname = "student_rewards"; // Replace with your actual database name
+$conn = new mysqli('localhost', 'root', '', 'student_rewards');
 
-// Establish connection to the MySQL database
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-// Check connection
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Get all vouchers from the laptop database
-$sql = "SELECT * FROM vouchers WHERE reward_amount IS NOT NULL";
-$result = $conn->query($sql);
+// Fetch vouchers from the main database
+$vouchers_query = "SELECT voucher_code, time_created, duration, duration_unit FROM vouchers";
+$result = $conn->query($vouchers_query);
 
 if ($result->num_rows > 0) {
-    // Loop through the vouchers and send them to the Orange Pi PC via REST API
+    $vouchers = [];
     while ($row = $result->fetch_assoc()) {
-        $voucher_code = $row['voucher_code'];
-        $duration = $row['duration'];
-        $duration_unit = $row['duration_unit'];
-        
-
-        // Send the voucher data to the Orange Pi PC's API
-        $url = "http://192.168.2.138/admin_voucher.php"; // Replace with your Orange Pi IP address
-        $data = http_build_query([
-            'voucher_code' => $voucher_code,
-            'duration' => $duration,
-            'duration_unit' => $duration_unit
-        ]);
-
-        // Use cURL for sending the POST request
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-
-        $response = curl_exec($ch);
-
-        // Check for errors in cURL
-        if (curl_errno($ch)) {
-            echo 'Error: ' . curl_error($ch) . "\n";
-            error_log("Failed to send voucher: " . $voucher_code . " Error: " . curl_error($ch), 3, "/path/to/log/file.log");
-        } else {
-            // Check if the response indicates success
-            echo "Voucher transfer successful: " . $voucher_code . " Response: " . $response . "\n";
-        }
-        curl_close($ch);
+        $vouchers[] = $row;
     }
 
-    echo "Voucher sync complete!";
+    // Send data to the Orange Pi
+    $url = 'http://192.168.2.138/receive_vouchers.php'; // Replace with Orange Pi's IP
+    $options = [
+        'http' => [
+            'header' => "Content-Type: application/json\r\n",
+            'method' => 'POST',
+            'content' => json_encode($vouchers),
+        ],
+    ];
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
+
+    if ($response === FALSE) {
+        die("Error syncing data to Orange Pi");
+    }
+
+    echo $response; // Display response from the Orange Pi
 } else {
-    echo "No vouchers to sync.";
+    echo json_encode(["status" => "error", "message" => "No vouchers to sync"]);
 }
 
-// Close the database connection
+
 $conn->close();
 ?>
+
+
 
